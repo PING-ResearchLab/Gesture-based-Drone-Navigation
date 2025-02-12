@@ -1,0 +1,294 @@
+import logging
+import sys
+import keyboard
+import time
+import numpy as np
+import cflib.crtp
+import plotly.graph_objs as go
+import plotly.io as pio
+import pandas as pd  # New import for creating the table
+from cflib.crazyflie import Crazyflie
+from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
+from cflib.crazyflie.log import LogConfig
+from cflib.positioning.motion_commander import MotionCommander
+from cflib.utils.multiranger import Multiranger
+import plotly.graph_objs as go
+
+URI = 'radio://0/80/2M'
+
+logging.basicConfig(level=logging.ERROR)
+
+DEFAULT_HEIGHT = 0.4
+VELOCITY = 0.2
+velocity_x = None
+velocity_y = None
+x = 0.0
+y = 0.0
+z = 0.0
+
+def is_close(range):  # checks if drone is within a specified distance of object in a specified direction
+    MIN_DISTANCE = 0.5  # m
+    if range is None:
+        return False
+    else:
+        return range < MIN_DISTANCE
+
+def deadend(range):  # checks if drone is within a different specified distance of object in a specified direction
+    dead_DISTANCE = 1  # meters
+    if range is None:
+        return False
+    else:
+        return range < dead_DISTANCE
+
+
+# Variables to store position data for plotting and table
+x_positions = [0]
+y_positions = [0]
+z_positions = [0]
+coordinates = []  # List to store coordinate data for the table
+
+# Variables to store detection points
+detection_x_positions = []
+detection_y_positions = []
+detection_z_positions = []
+
+# Create a 3D plot for tracking the drone's path
+trace = go.Scatter3d(x=x_positions, y=y_positions, z=z_positions, mode='lines+markers', name='Path', line=dict(width=2), marker=dict(size=2))
+
+# Create an empty obstacle trace to store columns dynamically
+obstacle_traces = []
+
+# Function to add detection points to the plot
+def add_detection_point(x, y, z):
+    detection_x_positions.append(x)
+    detection_y_positions.append(y)
+    detection_z_positions.append(z)
+
+
+# Function to add a column representing an obstacle
+def add_obstacle_column(x, y, z_start=0, height=0.8):
+    """
+    Adds a column at position (x, y) with a starting z value of z_start and height of `height`.
+    """
+    # Define the base and top coordinates of the column
+    # x_coords = [x, x, x + 0.1, x + 0.1, x]
+    # y_coords = [y, y + 0.1, y + 0.1, y, y]
+    # z_coords = [z_start, z_start, z_start, z_start, z_start + height]  # From z=0 to z=height
+
+    # Base coordinates of the column
+    x_coords = [x, x + 0.1, x + 0.1, x, x]  # Rectangle in the X direction
+    y_coords = [y, y, y + 0.1, y + 0.1, y]  # Rectangle in the Y direction
+    z_coords_base = [z_start] * 5  # Base z values (flat)
+    z_coords_top = [z_start + height] * 5  # Top z values (elevated by `height`)
+
+    # Combine the base and top vertices
+    x_all = x_coords * 2  # Duplicate for top and bottom faces
+    y_all = y_coords * 2
+    z_all = z_coords_base + z_coords_top
+
+    # Create a trace for the column (obstacle representation)
+    column = go.Mesh3d(
+        x=x_all,
+        y=y_all,
+        z=z_all,
+        # Triangles connecting vertices (faces of the column)
+        i=[0, 0, 0, 1, 1, 2, 2, 3, 3],  # Indices for x/y/z
+        j=[1, 2, 3, 2, 3, 3, 0, 0, 1],
+        k=[4, 5, 6, 5, 6, 7, 7, 4, 5],
+        # x=x_coords * 2,  # Duplicate for top and bottom faces
+        # y=y_coords * 2,
+        # z=z_coords + [z_start + height] * 5,  # Top face z-values
+        color='red',
+        opacity=0.6,
+        name=f'Obstacle at ({x:.2f}, {y:.2f})'
+    )
+    # Append the column to the obstacle traces
+    obstacle_traces.append(column)
+    # Add the column to the figure
+    fig.add_trace(column)
+
+# detection_trace = go.Scatter3d(
+#     x=detection_x_positions,
+#     y=detection_y_positions,
+#     z=detection_z_positions,
+#     mode='markers',
+#     name='Obstacle Detected',
+#     marker=dict(size=60, color='red', symbol='square'))
+
+layout = go.Layout(title='Crazyflie 3D Path', scene=dict(
+    xaxis=dict(range=[-1, 4], title='X Position (m)'),
+    yaxis=dict(range=[-1, 1], title='Y Position (m)'),
+    zaxis=dict(range=[0, 1], title='Z Position (m)')
+))
+fig = go.Figure(data=[trace], layout=layout)
+
+
+
+
+# Function to update the 3D plot with new positions and dynamically change axis limits
+def update_plot():
+    global fig
+    fig.data[0].x = x_positions
+    fig.data[0].y = y_positions
+    fig.data[0].z = z_positions
+    # fig.data[1].x = detection_x_positions
+    # fig.data[1].y = detection_y_positions
+    # fig.data[1].z = detection_z_positions
+    
+    # Get current axis limits
+    x_min, x_max = fig.layout.scene.xaxis.range
+    y_min, y_max = fig.layout.scene.yaxis.range
+    z_min, z_max = fig.layout.scene.zaxis.range
+
+    # Check if the drone's position is outside the current limits and update limits dynamically
+    if x_positions[-1] > x_max or x_positions[-1] < x_min:
+        fig.layout.scene.xaxis.range = [min(x_positions[-1], x_min) - 1, max(x_positions[-1], x_max) + 1]
+
+    if y_positions[-1] > y_max or y_positions[-1] < y_min:
+        fig.layout.scene.yaxis.range = [min(y_positions[-1], y_min) - 1, max(y_positions[-1], y_max) + 1]
+
+    if z_positions[-1] > z_max or z_positions[-1] < z_min:
+        fig.layout.scene.zaxis.range = [min(z_positions[-1], z_min) - 0.5, max(z_positions[-1], z_max) + 0.5]
+
+# Log configuration for the flow deck
+log_conf = LogConfig(name='Position', period_in_ms=100)
+log_conf.add_variable('kalman.stateX', 'float')
+log_conf.add_variable('kalman.stateY', 'float')
+log_conf.add_variable('kalman.stateZ', 'float')
+
+
+# Variable to store the initial timestamp
+initial_timestamp = None
+
+# Log callback function to capture and plot position data
+def log_pos_callback(timestamp, data, logconf):
+    global initial_timestamp
+    if initial_timestamp is None:
+        initial_timestamp = timestamp  # Store the first timestamp as the initial one
+
+    # Calculate the offset timestamp starting from zero
+    adjusted_timestamp = timestamp - initial_timestamp
+
+    # Get X, Y, and Z positions from the Kalman filter (flow deck data)
+    x = data['kalman.stateX']
+    y = data['kalman.stateY']
+    z = data['kalman.stateZ']
+    x_positions.append(x)
+    y_positions.append(y)
+    z_positions.append(z)
+    
+    # Append the adjusted timestamp and coordinates to the list for the table
+    coordinates.append({'Timestamp': adjusted_timestamp, 'X': x, 'Y': y, 'Z': z})
+    
+    # Update the plot each time new data comes in
+    update_plot()
+
+
+if __name__ == '__main__':
+    # Initialize the low-level drivers
+    cflib.crtp.init_drivers(enable_debug_driver=False)
+    cf = Crazyflie(rw_cache='./cache')
+    with SyncCrazyflie(URI, cf=cf) as scf:
+        with Multiranger(scf) as multiranger:
+            with MotionCommander(scf, default_height=DEFAULT_HEIGHT) as mc:
+                scf.cf.log.add_config(log_conf)
+                log_conf.data_received_cb.add_callback(log_pos_callback)
+                try:
+                    while x < 1:
+                        log_conf.start()
+                        if not is_close(multiranger.front):  # if no object in front of drone
+                            velocity_x = VELOCITY  # go forward at 0.2 m/s
+                            velocity_y = 0.0
+                            x = x + VELOCITY
+                            print('point 1')
+
+                        if is_close(multiranger.front):  # if an object is within 0.4m in front of drone
+                            velocity_x = 0  # stop drone
+                            # Add detection point to the plot
+                            add_detection_point(x, y, z)
+                            add_obstacle_column(x+multiranger.front, y, z_start=0, height=0.8)  # Add a column on the map
+                            if deadend(multiranger.left) and deadend(multiranger.right):  # both left and right blocked
+                                # Add detection point to the plot
+                                add_detection_point(x, y, z)
+                                add_obstacle_column(x, y-multiranger.right, z_start=0, height=0.8)  # Add a column on the map
+                                add_obstacle_column(x, y+multiranger.left, z_start=0, height=0.8)  # Add a column on the map
+                                while deadend(multiranger.right):  # go backwards until clear
+                                    velocity_x = -0.1  # go backwards at 0.1m/s
+                                    velocity_y = 0
+                                    x = x + velocity_x
+                                    print("point 4")
+                                    print("position x =" + str(x) + "and position y =" + str(y))
+                                    mc.start_linear_motion(velocity_x, velocity_y, 0)
+                                    time.sleep(1)
+                                    
+                                mc.move_distance(-0.2, 0, 0)
+
+                                while not is_close(multiranger.front):  # go right
+                                    velocity_x = 0  # stop going backwards
+                                    velocity_y = -0.1  # go right at 0.1m/s
+                                    y = y + velocity_y
+                                    print("point 7")
+                                    print("position x =" + str(x) + "and position y =" + str(y))
+                                    mc.start_linear_motion(velocity_x, velocity_y, 0)
+                                    time.sleep(1)
+
+                                while is_close(multiranger.front):  # go right as long as front is blocked
+                                    velocity_x = 0
+                                    velocity_y = -0.1
+                                    y = y + velocity_y
+                                    print("point 8")
+                                    print("position x =" + str(x) + "and position y =" + str(y))
+                                    mc.start_linear_motion(velocity_x, velocity_y, 0)
+                                    time.sleep(1)
+                                    
+                        while is_close(multiranger.front):  # if front is blocked
+                            velocity_x = 0.0
+                            if is_close(multiranger.front) and not is_close(multiranger.right):  # move right
+                                velocity_x = 0
+                                # Add detection point to the plot
+                                add_detection_point(x, y, z)
+                                while is_close(multiranger.front):
+                                    velocity_x = 0.0
+                                    velocity_y = -0.1  # go right at 0.1m/s
+                                    y = y + velocity_y
+                                    print('point 2')
+                                    print("position x =" + str(x) + "and position y =" + str(y))
+                                    mc.start_linear_motion(velocity_x, velocity_y, 0)
+                                    time.sleep(1)
+
+                            if is_close(multiranger.front) and is_close(multiranger.right):  # if front and right blocked
+                                velocity_x = 0.0
+                                # Add detection point to the plot
+                                add_detection_point(x, y, z)
+                                add_obstacle_column(x, y-multiranger.right, z_start=0, height=0.8)  # Add a column on the map
+                                update_plot()
+                                while is_close(multiranger.front):
+                                    velocity_x = 0.0
+                                    velocity_y = 0.1  # go left at 0.1m/s
+                                    y = y + velocity_y
+                                    print('point 3')
+                                    print("position x =" + str(x) + "and position y =" + str(y))
+                                    mc.start_linear_motion(velocity_x, velocity_y, 0)
+                                    time.sleep(1)
+                            print("position x =" + str(x) + "and position y =" + str(y))
+                            mc.start_linear_motion(velocity_x, velocity_y, 0)
+                            time.sleep(1)
+                        print("position x =" + str(x) + "and position y =" + str(y))
+                        mc.start_linear_motion(velocity_x, velocity_y, 0)
+                        time.sleep(1)
+                        velocity_x = 0
+                    velocity_x = 0
+                    mc.stop()
+                    mc.land()
+                    log_conf.stop()
+
+                    # Save the interactive 3D plot as an HTML file
+                    pio.write_html(fig, file='crazyflie_3d_path.html', auto_open=True)
+
+                    # Save the coordinates as a table (CSV file) after the flight ends
+                    df = pd.DataFrame(coordinates)
+                    df.to_csv('crazyflie_flight_path.csv', index=False)
+                    print("Flight path coordinates saved to 'crazyflie_flight_path.csv'")
+
+                except KeyboardInterrupt:
+                    print("Flight interrupted by user.")
