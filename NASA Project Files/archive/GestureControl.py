@@ -1,0 +1,237 @@
+import cv2
+import mediapipe as mp
+import logging
+import sys
+import pyautogui
+import random
+import util
+import cv2
+import time
+import cflib
+from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
+from cflib.positioning.motion_commander import MotionCommander
+import cflib
+import cflib.crtp
+from cflib.crazyflie import Crazyflie
+from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
+from cflib.positioning.motion_commander import MotionCommander
+from cflib.utils.multiranger import Multiranger
+ 
+uri = 'radio://0/80/2M'
+ 
+# Initialize the low-level drivers
+cflib.crtp.init_drivers()
+logging.basicConfig(level=logging.ERROR)
+ 
+ 
+screen_width, screen_height = pyautogui.size()
+ 
+mpHands = mp.solutions.hands
+hands = mpHands.Hands(
+    static_image_mode=False,
+    model_complexity=1,
+    min_detection_confidence=0.7,
+    min_tracking_confidence=0.7,
+    max_num_hands=1
+)
+ 
+def is_close(range):
+    MIN_DISTANCE = 0.35  # m
+ 
+    if range is None:
+        return False
+    else:
+        return range < MIN_DISTANCE
+ 
+def rock(landmark_list, thumb_index_dist):
+    return (
+        util.get_angle(landmark_list[0], landmark_list[5], landmark_list[6]) > 120 and
+        util.get_angle(landmark_list[5], landmark_list[6], landmark_list[8]) > 120 and
+        #util.get_distance([landmark_list[8], landmark_list[5]]) > 100 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) < 130 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) < 130 and
+        util.get_angle(landmark_list[17], landmark_list[18], landmark_list[19]) > 120 and
+        util.get_angle(landmark_list[0], landmark_list[17], landmark_list[18]) > 120
+        #thumb_index_dist > 50
+    )
+ 
+def pinky(landmark_list, thumb_index_dist):
+    return (
+        util.get_angle(landmark_list[5], landmark_list[6], landmark_list[8]) < 130 and
+        #util.get_distance([landmark_list[8], landmark_list[5]]) > 100 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) < 130 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) < 130 and
+        util.get_angle(landmark_list[17], landmark_list[18], landmark_list[19]) > 120 and
+        util.get_angle(landmark_list[0], landmark_list[17], landmark_list[18]) > 120
+        #thumb_index_dist > 50
+    )
+ 
+def hand_open(landmark_list, thumb_index_dist):
+    return (
+        util.get_angle(landmark_list[0], landmark_list[5], landmark_list[6]) > 120 and
+        util.get_angle(landmark_list[5], landmark_list[6], landmark_list[8]) > 120 and
+        #util.get_distance([landmark_list[8], landmark_list[5]]) > 100 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) > 120 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) > 120 and
+        util.get_angle(landmark_list[17], landmark_list[18], landmark_list[19]) > 120 and
+        thumb_index_dist > 50
+    )
+ 
+def three_fing(landmark_list, thumb_index_dist):
+    return (
+        util.get_angle(landmark_list[0], landmark_list[5], landmark_list[6]) > 120 and
+        util.get_angle(landmark_list[5], landmark_list[6], landmark_list[8]) > 120 and
+        #util.get_distance([landmark_list[8], landmark_list[5]]) > 100 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) > 120 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) > 120 and
+        util.get_angle(landmark_list[0], landmark_list[17], landmark_list[19]) > 120
+    )
+ 
+def hand_closed(landmark_list, thumb_index_dist):
+    return (
+        util.get_angle(landmark_list[5], landmark_list[6], landmark_list[7]) < 100 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) < 100 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) < 100 and
+        util.get_angle(landmark_list[17], landmark_list[18], landmark_list[19]) < 100 and
+        util.get_distance([landmark_list[4], landmark_list[17]]) < 225
+    )
+ 
+def thumb_up(landmark_list, thumb_index_dist):
+    return (
+        util.get_angle(landmark_list[5], landmark_list[6], landmark_list[7]) < 100 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) < 100 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) < 100 and
+        util.get_angle(landmark_list[17], landmark_list[18], landmark_list[19]) < 100 and
+        util.get_distance([landmark_list[4], landmark_list[17]]) > 225
+    )
+ 
+def point(landmark_list, thumb_index_dist):
+    return (
+        util.get_angle(landmark_list[0], landmark_list[5], landmark_list[6]) > 120 and
+        util.get_angle(landmark_list[5], landmark_list[6], landmark_list[8]) > 120 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) < 100 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) < 100 and
+        util.get_angle(landmark_list[17], landmark_list[18], landmark_list[19]) < 100 #and
+        #util.get_angle(landmark_list[1], landmark_list[2], landmark_list[3]) < 100
+        #thumb_index_dist > 50
+    )
+ 
+def peace(landmark_list, thumb_index_dist):
+    return (
+        util.get_angle(landmark_list[0], landmark_list[5], landmark_list[6]) > 120 and
+        util.get_angle(landmark_list[5], landmark_list[6], landmark_list[8]) > 120 and
+        util.get_angle(landmark_list[0], landmark_list[9], landmark_list[10]) > 120 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) > 120 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) < 100 and
+        util.get_angle(landmark_list[17], landmark_list[18], landmark_list[19]) < 100 #and
+        #util.get_angle(landmark_list[1], landmark_list[2], landmark_list[3]) < 100
+        #thumb_index_dist > 50
+    )
+ 
+def fudge(landmark_list, thumb_index_dist):
+    return (
+        util.get_angle(landmark_list[5], landmark_list[6], landmark_list[8]) < 100 and
+        util.get_angle(landmark_list[0], landmark_list[9], landmark_list[10]) > 120 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) > 120 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) < 100 and
+        util.get_angle(landmark_list[17], landmark_list[18], landmark_list[19]) < 100
+        #thumb_index_dist > 50
+    )
+ 
+def nice(landmark_list, thumb_index_dist):
+    return (
+         util.get_angle(landmark_list[5], landmark_list[6], landmark_list[8]) < 100 and
+        util.get_angle(landmark_list[0], landmark_list[9], landmark_list[10]) > 120 and
+        util.get_angle(landmark_list[9], landmark_list[10], landmark_list[11]) > 120 and
+        util.get_angle(landmark_list[0], landmark_list[13], landmark_list[14]) > 120 and
+        util.get_angle(landmark_list[13], landmark_list[14], landmark_list[15]) > 120 and
+        util.get_angle(landmark_list[0], landmark_list[17], landmark_list[18]) > 120 and
+        util.get_angle(landmark_list[17], landmark_list[18], landmark_list[19]) > 120 and
+        util.get_distance([landmark_list[4], landmark_list[8]]) < 70
+        #util.get_angle(landmark_list[1], landmark_list[2], landmark_list[3]) < 100
+        #thumb_index_dist > 50
+    )
+ 
+#turning is mc.turn_left(180)
+ 
+def detect_gesture(frame, landmark_list, processed, mc):
+    if len(landmark_list) >= 21:
+        thumb_index_dist = util.get_distance([landmark_list[4], landmark_list[5]])
+ 
+        if hand_open(landmark_list, thumb_index_dist):
+            cv2.putText(frame, "Up", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mc.up(0.05)
+        elif hand_closed(landmark_list, thumb_index_dist):
+            cv2.putText(frame, "Down", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mc.down(0.05)
+        elif point(landmark_list, thumb_index_dist):
+            cv2.putText(frame, "Forward", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mc.forward(0.05)  
+        elif peace(landmark_list, thumb_index_dist):
+            cv2.putText(frame, "Back", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mc.back(0.05)
+        elif fudge(landmark_list, thumb_index_dist):
+            cv2.putText(frame, "Turn Left", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mc.turn_left(45)
+        elif nice(landmark_list, thumb_index_dist):
+            cv2.putText(frame, "Land", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mc.land()
+        elif thumb_up(landmark_list, thumb_index_dist):
+            cv2.putText(frame, "Right", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mc.right(0.05)  
+        elif rock(landmark_list, thumb_index_dist):
+            cv2.putText(frame, "Turn Right", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mc.turn_right(45)
+        elif pinky(landmark_list, thumb_index_dist):
+            cv2.putText(frame, "Left", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mc.left(0.05)
+ 
+def main():
+    draw = mp.solutions.drawing_utils
+    cap = cv2.VideoCapture(0)
+ 
+    with SyncCrazyflie(uri) as scf:
+        with MotionCommander(scf) as mc:
+            with Multiranger(scf) as multi_ranger:
+                try:
+                    while cap.isOpened():
+                        if is_close(multi_ranger.front):
+                            mc.back(0.2)
+                            #motion_commander.turn_right(90)
+                        elif is_close(multi_ranger.back):
+                            mc.forward(0.2)
+                        elif is_close(multi_ranger.left):
+                            mc.right(0.2)
+                        elif is_close(multi_ranger.right):
+                            mc.left(0.2)
+                        elif is_close(multi_ranger.up):
+                            mc.down(0.2)
+                        elif is_close(multi_ranger.down):
+                            mc.up(0.2)
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+                        frame = cv2.flip(frame, 1)
+                        frameRGB = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        processed = hands.process(frameRGB)
+ 
+                        landmark_list = []
+                        if processed.multi_hand_landmarks:
+                            hand_landmarks = processed.multi_hand_landmarks[0]  # Assuming only one hand is detected
+                            draw.draw_landmarks(frame, hand_landmarks, mpHands.HAND_CONNECTIONS)
+                            for lm in hand_landmarks.landmark:
+                                landmark_list.append((lm.x, lm.y))
+ 
+                        # Detect gestures and control Crazyflie
+                        detect_gesture(frame, landmark_list, processed, mc)
+ 
+                        cv2.imshow('Frame', frame)
+                        if cv2.waitKey(1) & 0xFF == ord('q'):
+                            break
+                finally:
+                    cap.release()
+                    cv2.destroyAllWindows()
+ 
+if __name__ == '__main__':
+    main()
+ 

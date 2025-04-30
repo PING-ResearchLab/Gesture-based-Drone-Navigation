@@ -1,0 +1,149 @@
+import argparse
+import socket
+import struct
+import time
+import numpy as np
+import cv2
+import plotly.graph_objects as go
+from dash import dcc, html, Dash
+from dash.dependencies import Output, Input
+import threading
+from collections import deque
+
+# Argument parser for AI-deck connection
+parser = argparse.ArgumentParser(description='Connect to AI-deck JPEG streamer example')
+parser.add_argument("-n", default="192.168.4.1", metavar="ip", help="AI-deck IP")
+parser.add_argument("-p", type=int, default=5000, metavar="port", help="AI-deck port")
+parser.add_argument('--save', action='store_true', help="Save streamed images")
+args = parser.parse_args()
+
+deck_ip = args.n
+deck_port = args.p
+
+# Socket connection
+print(f"Connecting to socket on {deck_ip}:{deck_port}...")
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket.connect((deck_ip, deck_port))
+print("Socket connected")
+
+# Global variables for LED tracking
+positions = deque(maxlen=100)
+keep_running = True
+CALIBRATION_FACTOR = 0.01
+BOX_SIZE = 50
+prev_center = None
+
+# Dash app for visualization
+app = Dash(__name__)
+app.layout = html.Div([
+    html.H1("Brightest RGB LED Trajectory (in Meters)", style={"text-align": "center"}),
+    dcc.Graph(id="live-graph"),
+    dcc.Interval(id="interval-component", interval=500, n_intervals=0)
+])
+
+@app.callback(Output("live-graph", "figure"), Input("interval-component", "n_intervals"))
+def update_graph(n_intervals):
+    x_vals = [pos[0] * CALIBRATION_FACTOR for pos in positions]
+    y_vals = [pos[1] * CALIBRATION_FACTOR for pos in positions]
+    z_vals = [pos[2] for pos in positions]
+    
+    fig = go.Figure(data=[go.Scatter3d(
+        x=x_vals, y=y_vals, z=z_vals, mode='lines+markers',
+        marker=dict(size=5, color=np.linspace(0, 1, len(z_vals)), colorscale='Viridis', opacity=0.8),
+        line=dict(color='blue', width=2)
+    )])
+    fig.update_layout(title="Brightest RGB LED Trajectory (in Meters)",
+                      scene=dict(xaxis_title="X Axis", yaxis_title="Y Axis", zaxis_title="Z Axis"))
+    return fig
+
+
+def rx_bytes(size):
+    data = bytearray()
+    while len(data) < size:
+        data.extend(client_socket.recv(size - len(data)))
+    return data
+
+
+def detect_brightest_led(frame, threshold=200):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    lower_red, upper_red = np.array([0, 150, threshold]), np.array([10, 255, 255])
+    lower_green, upper_green = np.array([40, 150, threshold]), np.array([80, 255, 255])
+    lower_blue, upper_blue = np.array([100, 150, threshold]), np.array([140, 255, 255])
+    
+    red_mask, green_mask, blue_mask = cv2.inRange(hsv, lower_red, upper_red), cv2.inRange(hsv, lower_green, upper_green), cv2.inRange(hsv, lower_blue, upper_blue)
+    combined_mask = cv2.bitwise_or(cv2.bitwise_or(red_mask, green_mask), blue_mask)
+    contours, _ = cv2.findContours(combined_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    brightest, brightest_area = None, 0
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area > brightest_area:
+            brightest_area, brightest = area, contour
+    
+    if brightest is not None:
+        x, y, w, h = cv2.boundingRect(brightest)
+        return (x + w // 2, y + h // 2)
+    return None
+
+
+def process_stream():
+    global positions, keep_running, prev_center
+    count, start = 0, time.time()
+    
+    while keep_running:
+        packetInfoRaw = rx_bytes(4)
+        [length, routing, function] = struct.unpack('<HBB', packetInfoRaw)
+        imgHeader = rx_bytes(length - 2)
+        [magic, width, height, depth, format, size] = struct.unpack('<BHHBBI', imgHeader)
+        
+        if magic == 0xBC:
+            imgStream = bytearray()
+            while len(imgStream) < size:
+                packetInfoRaw = rx_bytes(4)
+                [length, dst, src] = struct.unpack('<HBB', packetInfoRaw)
+                chunk = rx_bytes(length - 2)
+                imgStream.extend(chunk)
+            
+            count += 1
+            meanTimePerImage = (time.time() - start) / count
+            print(f"FPS: {1 / meanTimePerImage:.2f}")
+            
+            if format == 0:
+                bayer_img = np.frombuffer(imgStream, dtype=np.uint8).reshape((244, 324))
+                color_img = cv2.cvtColor(bayer_img, cv2.COLOR_BayerBG2BGRA)
+                frame = color_img.copy()
+            else:
+                nparr = np.frombuffer(imgStream, np.uint8)
+                frame = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
+            
+            center = detect_brightest_led(frame)
+            if center:
+                prev_center = center if prev_center is None else (
+                    int(0.8 * prev_center[0] + 0.2 * center[0]),
+                    int(0.8 * prev_center[1] + 0.2 * center[1])
+                )
+                x_center, y_center, z = prev_center[0], prev_center[1], 1.0
+                positions.append((x_center, y_center, z))
+                
+                half_size = BOX_SIZE // 2
+                x1, y1, x2, y2 = x_center - half_size, y_center - half_size, x_center + half_size, y_center + half_size
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            cv2.imshow('LED Detection', frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                keep_running = False
+                break
+    
+    client_socket.close()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    try:
+        streaming_thread = threading.Thread(target=process_stream)
+        streaming_thread.start()
+        app.run_server(debug=False, use_reloader=False)
+        streaming_thread.join()
+    except KeyboardInterrupt:
+        print("Exiting...")
+        keep_running = False
+        streaming_thread.join()
