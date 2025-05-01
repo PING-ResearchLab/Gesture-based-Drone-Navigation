@@ -1,6 +1,6 @@
-# Project Title
+# Intuitive Drone Control and Features
 
-Simple overview of use/purpose.
+This repository contains the full Python implementation for a multifunctional drone control system designed for the Bitcraze Crazyflie 2.1 drone. The system integrates four key components: hand gesture recognition, autonomous obstacle avoidance, 3D flight path and obstacle mapping, and first-person video (FPV) streaming via the AI-Deck. Together, these features enable intuitive and safe drone navigation, making it accessible for beginners and useful for research in human-drone interaction and autonomous systems.
 
 ## Description
 
