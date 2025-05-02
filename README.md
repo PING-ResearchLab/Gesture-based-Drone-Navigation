@@ -39,7 +39,6 @@ pip install cflib
 * GAP8 toolchain and SDK from Bitcraze
 * Python sockets for communication
 * OpenCV (for video decoding and display)
-* Step-by-Step Process (https://www.bitcraze.io/documentation/tutorials/getting-started-with-aideck/)
 
 ### Installing
 
@@ -51,7 +50,7 @@ cd gesture-drone-system
 Replace your-username with your actual GitHub username.
 #### 2. Proper Files
 Ensure the following files are available:
-* AIdeckMapping.py: Contains entire multifunctional drone system
+* AiDeckMapping.py: Contains entire multifunctional drone system
 * util.py: Contains helper functions used for gesture angle/distance calculations
 #### 3. Configure AI-Deck (Linux Only)
 * Follow Step-by-Step Process (see https://www.bitcraze.io/documentation/tutorials/getting-started-with-aideck/)
@@ -62,7 +61,7 @@ Follow these steps to run the full system, which includes gesture control, obsta
 #### 1. Power On the Crazyflie 2.1 Drone
 * Ensure the Flow Deck V2, Multi-Ranger Deck, and AI-Deck are properly mounted
 * Connect the Crazyradio USB dongle to your computer
-#### 2. Run the AIdeckMapping Python Script
+#### 2. Run the AiDeckMapping Python Script
 This script:
 * Initializes the Crazyflie connection
 * Starts gesture recognition with your webcam
