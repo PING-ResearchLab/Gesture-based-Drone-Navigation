@@ -44,10 +44,9 @@ pip install cflib
 
 #### 1. Clone the Repository
 ```
-git clone https://github.com/your-username/gesture-drone-system.git
-cd gesture-drone-system
+git clone https://github.com/PING-ResearchLab/DroneLab-Code.git
+cd DroneLab-Code
 ```
-Replace your-username with your actual GitHub username.
 #### 2. Proper Files
 Ensure the following files are available:
 * AiDeckMapping.py: Contains entire multifunctional drone system
