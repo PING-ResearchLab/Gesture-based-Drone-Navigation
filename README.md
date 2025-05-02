@@ -49,23 +49,12 @@ git clone https://github.com/your-username/gesture-drone-system.git
 cd gesture-drone-system
 ```
 Replace your-username with your actual GitHub username.
-#### 2. Folder Structure
-Ensure the following structure is intact:
-```
-gesture-drone-system/
-│
-├── gesture_control.py
-├── obstacle_avoidance.py
-├── mapping_visualizer.py
-├── ai_deck_stream.py
-├── util.py
-├── cache/
-├── stream_out/
-│   └── (optional) Saved AI-deck images
-├── crazyflie_flight_path.csv
-├── crazyflie_3d_path.html
-└── README.md
-```
+#### 2. Proper Files
+Ensure the following files are available:
+* AIdeckMapping.py: Contains entire multifunctional drone system
+* util.py: Contains helper functions used for gesture angle/distance calculations
+#### 3. Configure AI-Deck (Linux Only)
+* Follow Step-by-Step Process (see https://www.bitcraze.io/documentation/tutorials/getting-started-with-aideck/)
 
 ### Executing program
 
