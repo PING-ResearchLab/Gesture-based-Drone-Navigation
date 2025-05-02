@@ -9,10 +9,17 @@ This project showcases a fully integrated drone control system that combines han
 ## Getting Started
 
 ### Dependencies
-#### test
+#### Operating System
+* Windows or MacOS
+#### Hardware Requirements
+* Bitcraze Crazyflie 2.1 Drone
+* Flow Deck V2
+* Multi-Ranger Deck
+* AI-Deck 1.1
+* Crazyradio Dongle
+* 
 
-* Describe any prerequisites, libraries, OS version, etc., needed before installing program.
-* ex. Windows 10
+
 
 ### Installing
 
