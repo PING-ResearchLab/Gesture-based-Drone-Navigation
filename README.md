@@ -58,11 +58,25 @@ Ensure the following files are available:
 
 ### Executing program
 
-* How to run the program
-* Step-by-step bullets
-```
-code blocks for commands
-```
+Follow these steps to run the full system, which includes gesture control, obstacle avoidance, 3D mapping, and FPV streaming with the AI-Deck:
+#### 1. Power On the Crazyflie 2.1 Drone
+* Ensure the Flow Deck V2, Multi-Ranger Deck, and AI-Deck are properly mounted
+* Connect the Crazyradio USB dongle to your computer
+#### 2. Run the AIdeckMapping Python Script
+This script:
+* Initializes the Crazyflie connection
+* Starts gesture recognition with your webcam
+* Activates obstacle detection
+* Begins AI-Deck video streaming
+* Starts logging flight data for the 3D map
+#### 3. Use Hand Gestures to Fly
+* Position your hand about 1 foot from the webcam
+* Use predefined gestures (e.g., point, peace, fist) to control the drone
+#### 4. Land the Drone
+* Use the “OK” gesture to land the drone safely and end the flight session
+#### 5. View Output
+* crazyflie_3d_path.html: Interactive 3D map of flight path and obstacles
+
 
 ## Help
 
