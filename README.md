@@ -17,9 +17,29 @@ This project showcases a fully integrated drone control system that combines han
 * Multi-Ranger Deck
 * AI-Deck 1.1
 * Crazyradio Dongle
-* 
-
-
+#### Python Version
+* Python 3.8+ (recommended)
+#### Python Libraries
+Install the following libraries using pip:
+```
+install opencv-python
+pip install mediapipe
+pip install pyautogui
+pip install plotly
+pip install pandas
+pip install numpys
+```
+#### Bitcraze Python Libraries
+Install the Bitcraze Crazyflie Python API:
+```
+pip install cflib
+```
+#### Tools for AI-Deck Setup
+* Ubuntu Linux
+* GAP8 toolchain and SDK from Bitcraze
+* Python sockets for communication
+* OpenCV (for video decoding and display)
+* Step-by-Step Process (https://www.bitcraze.io/documentation/tutorials/getting-started-with-aideck/)
 
 ### Installing
 
