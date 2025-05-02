@@ -60,7 +60,7 @@ Follow these steps to run the full system, which includes gesture control, obsta
 #### 1. Power On the Crazyflie 2.1 Drone
 * Ensure the Flow Deck V2, Multi-Ranger Deck, and AI-Deck are properly mounted
 * Connect the Crazyradio USB dongle to your computer
-#### 2. Run the AiDeckMapping Python Script
+#### 2. Run the AiDeckMapping Python Script (from NASA Project Files)
 This script:
 * Initializes the Crazyflie connection
 * Starts gesture recognition with your webcam
