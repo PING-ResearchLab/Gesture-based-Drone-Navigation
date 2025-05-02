@@ -43,8 +43,29 @@ pip install cflib
 
 ### Installing
 
-* How/where to download your program
-* Any modifications needed to be made to files/folders
+#### 1. Clone the Repository
+```
+git clone https://github.com/your-username/gesture-drone-system.git
+cd gesture-drone-system
+```
+Replace your-username with your actual GitHub username.
+#### 2. Folder Structure
+Ensure the following structure is intact:
+```
+gesture-drone-system/
+│
+├── gesture_control.py
+├── obstacle_avoidance.py
+├── mapping_visualizer.py
+├── ai_deck_stream.py
+├── util.py
+├── cache/
+├── stream_out/
+│   └── (optional) Saved AI-deck images
+├── crazyflie_flight_path.csv
+├── crazyflie_3d_path.html
+└── README.md
+```
 
 ### Executing program
 
