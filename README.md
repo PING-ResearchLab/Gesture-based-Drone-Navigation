@@ -75,17 +75,9 @@ This script:
 #### 5. View Output
 * crazyflie_3d_path.html: Interactive 3D map of flight path and obstacles
 
-
-## Help
-
-Any advise for common problems or issues.
-```
-command to run if program contains helper info
-```
-
 ## Authors
 
 Contributors names and contact info
 
-ex. Dominique Pizzie  
-ex. [@DomPizzie](https://twitter.com/dompizzie)
+* Ben Taylor (https://github.com/btaylor49787)
+* Pingping Zhu (PING-ResearchLab)
