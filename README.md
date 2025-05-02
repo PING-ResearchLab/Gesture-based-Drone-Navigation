@@ -80,4 +80,4 @@ This script:
 Contributors names and contact info
 
 * Ben Taylor (https://github.com/btaylor49787)
-* Pingping Zhu (PING-ResearchLab)
+* Pingping Zhu (https://github.com/PING-ResearchLab)
