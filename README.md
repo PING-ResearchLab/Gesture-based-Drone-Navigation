@@ -22,12 +22,12 @@ This project showcases a fully integrated drone control system that combines han
 #### Python Libraries
 Install the following libraries using pip:
 ```
-install opencv-python
+pip install opencv-python
 pip install mediapipe
 pip install pyautogui
 pip install plotly
 pip install pandas
-pip install numpys
+pip install numpy
 ```
 #### Bitcraze Python Libraries
 Install the Bitcraze Crazyflie Python API:
