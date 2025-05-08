@@ -44,8 +44,8 @@ pip install cflib
 
 #### 1. Clone the Repository
 ```
-git clone https://github.com/PING-ResearchLab/DroneLab-Code.git
-cd DroneLab-Code
+git clone https://github.com/PING-ResearchLab/Gesture-based-Drone-Navigation.git
+cd Gesture-based-Drone-Navigation
 ```
 #### 2. Proper Files
 Ensure the following files are available:
